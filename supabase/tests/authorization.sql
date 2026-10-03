@@ -1,0 +1,202 @@
+-- Run against a disposable migrated Supabase database as its database owner.
+-- Everything is rolled back. The Vitest runner provides only auth/role shims.
+begin;
+create function pg_temp.check_true(ok boolean, message text) returns void language plpgsql as $$
+begin if ok is distinct from true then raise exception 'Assertion failed: %', message; end if; end $$;
+create function pg_temp.reject(statement text, fragment text) returns void language plpgsql as $$
+declare rejected boolean := false;
+begin
+  begin execute statement;
+  exception when others then
+    if position(fragment in sqlerrm) = 0 then raise exception 'Unexpected rejection: %, expected %', sqlerrm, fragment; end if;
+    rejected := true;
+  end;
+  if not rejected then raise exception 'Expected rejection: %', statement; end if;
+end $$;
+
+insert into auth.users(id,email,raw_user_meta_data) values
+('10000000-0000-0000-0000-000000000001','applicant@test.example','{"role":"applicant"}'),
+('10000000-0000-0000-0000-000000000002','other@test.example','{"role":"applicant"}'),
+('20000000-0000-0000-0000-000000000001','employer@test.example','{"role":"employer"}'),
+('20000000-0000-0000-0000-000000000002','other-employer@test.example','{"role":"employer"}'),
+('30000000-0000-0000-0000-000000000001','admin@test.example','{"role":"admin"}');
+select pg_temp.check_true((select role = 'applicant' from public.accounts where id='30000000-0000-0000-0000-000000000001'), 'signup cannot assign admin');
+update public.accounts set role='admin' where id='30000000-0000-0000-0000-000000000001';
+
+set local role anon;
+select set_config('request.jwt.claim.sub','',true);
+select pg_temp.reject($q$select public.workspace_action('company.save','{}')$q$, 'Sign in');
+select pg_temp.check_true(public.workspace_snapshot()->>'role' is null, 'anonymous has no role');
+reset role;
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000001',true);
+select public.workspace_action('company.save','{"id":"hotel-test","ownerId":"20000000-0000-0000-0000-000000000002","name":"Test Hotel","type":"Hotel","city":"Mumbai","address":"Test Road","phone":"9876543210","email":"hotel@test.example","website":"","description":"A hotel","status":"approved","reviewReason":"fake approval","initials":"TH","color":"#226688"}');
+select pg_temp.check_true((select owner_id = auth.uid() and status='pending' from public.companies where id='hotel-test'),'ownership and moderation derive from actor');
+select pg_temp.reject($q$update public.companies set status='approved' where id='hotel-test'$q$,'permission denied');
+select pg_temp.reject($q$update public.accounts set role='admin' where id=auth.uid()$q$,'permission denied');
+select pg_temp.reject($q$select public.workspace_action('company.review','{"id":"hotel-test","status":"approved","reason":""}')$q$,'Administrator');
+select pg_temp.reject($q$select public.workspace_action('profile.save','{}')$q$,'Applicant');
+select pg_temp.reject($q$select public.workspace_action('job.save','{"id":"bad-job","companyId":"hotel-test","status":"draft","department":"Software","role":"Developer"}')$q$,'hospitality');
+select public.workspace_action('job.save','{"id":"job-test","companyId":"hotel-test","title":"Front Office Associate","department":"Front Office","role":"Front Desk Associate","city":"Mumbai","locality":"Andheri","propertyType":"Hotel","employmentType":"Full time","experienceMin":1,"experienceMax":5,"salaryMin":20000,"salaryMax":30000,"shift":"Rotational","accommodation":false,"meals":true,"openings":2,"description":"Welcome guests","skills":["Guest relations"],"languages":["English"],"joiningBy":"2027-01-01","questions":[{"id":"q1","label":"Night shift?","type":"yesno","options":[],"required":true,"dealBreaker":true,"expected":"yes","comparison":"equal"}],"status":"pending","createdAt":"1990-01-01"}');
+select pg_temp.reject(format('select public.workspace_action(''job.save'',%L::jsonb)',(select data||jsonb_build_object('questions',jsonb_build_array((data->'questions'->0)||'{"id":"constructor"}'::jsonb)) from public.job_revisions where job_id='job-test' and version=1)::text),'reserved');
+select pg_temp.reject(format('select public.workspace_action(''job.save'',%L::jsonb)',(select data||jsonb_build_object('questions',jsonb_build_array((data->'questions'->0)||'{"id":"__proto__"}'::jsonb)) from public.job_revisions where job_id='job-test' and version=1)::text),'reserved');
+select pg_temp.reject(format('select public.workspace_action(''job.save'',%L::jsonb)',(select data||jsonb_build_object('status','draft','questions',jsonb_build_array((data->'questions'->0)||'{"id":"toString"}'::jsonb)) from public.job_revisions where job_id='job-test' and version=1)::text),'reserved');
+-- A direct RPC must enforce the same mandatory fields as the posting form.
+select pg_temp.reject(format('select public.workspace_action(''job.save'',%L::jsonb)',(select data||'{"propertyType":""}'::jsonb from public.job_revisions where job_id='job-test' and version=1)::text),'property type');
+select pg_temp.reject(format('select public.workspace_action(''job.save'',%L::jsonb)',(select data-'propertyType' from public.job_revisions where job_id='job-test' and version=1)::text),'property type');
+select pg_temp.reject(format('select public.workspace_action(''job.save'',%L::jsonb)',(select data||'{"propertyType":"Office"}'::jsonb from public.job_revisions where job_id='job-test' and version=1)::text),'property type');
+select pg_temp.reject(format('select public.workspace_action(''job.save'',%L::jsonb)',(select data||'{"employmentType":""}'::jsonb from public.job_revisions where job_id='job-test' and version=1)::text),'employment type');
+select pg_temp.reject(format('select public.workspace_action(''job.save'',%L::jsonb)',(select data-'employmentType' from public.job_revisions where job_id='job-test' and version=1)::text),'employment type');
+select pg_temp.reject(format('select public.workspace_action(''job.save'',%L::jsonb)',(select data||'{"employmentType":"Arbitrary"}'::jsonb from public.job_revisions where job_id='job-test' and version=1)::text),'employment type');
+select pg_temp.reject(format('select public.workspace_action(''job.save'',%L::jsonb)',(select data||'{"shift":""}'::jsonb from public.job_revisions where job_id='job-test' and version=1)::text),'shift type');
+select pg_temp.reject(format('select public.workspace_action(''job.save'',%L::jsonb)',(select data-'shift' from public.job_revisions where job_id='job-test' and version=1)::text),'shift type');
+select pg_temp.reject(format('select public.workspace_action(''job.save'',%L::jsonb)',(select data||'{"shift":"Arbitrary"}'::jsonb from public.job_revisions where job_id='job-test' and version=1)::text),'shift type');
+select public.workspace_action('job.save','{"id":"incomplete-draft","companyId":"hotel-test","status":"draft","propertyType":"","employmentType":"","shift":""}');
+select pg_temp.check_true((select status='draft' from public.job_revisions where job_id='incomplete-draft' and version=1),'empty mandatory fields remain allowed for drafts');
+reset role;
+delete from public.job_revisions where job_id='incomplete-draft';
+delete from public.jobs where id='incomplete-draft';
+set local role authenticated;
+select pg_temp.reject($q$select public.workspace_action('job.save','{"id":"bad-job","companyId":"hotel-test","title":"Bad","experienceMin":5,"experienceMax":1,"salaryMin":300,"salaryMax":100,"questions":[]}')$q$,'Salary');
+select pg_temp.reject($q$select public.workspace_action('job.save','{"id":"bad-job","companyId":"hotel-test","title":"Bad","salaryMin":100,"salaryMax":300,"experienceMin":1,"experienceMax":5,"questions":[{"id":"same","label":"One","type":"yesno"},{"id":"same","label":"Two","type":"yesno"}]}')$q$,'unique');
+select pg_temp.reject($q$select public.workspace_action('job.save','{"id":"bad-job","companyId":"hotel-test","title":"Bad","salaryMin":100,"salaryMax":300,"experienceMin":1,"experienceMax":5,"questions":[{"id":"one","label":"One","type":"text","required":true,"dealBreaker":true,"expected":"foo"}]}')$q$,'Text');
+select pg_temp.reject($q$select public.workspace_action('job.save','{"id":"bad-job","companyId":"hotel-test","salaryMin":100,"salaryMax":300,"questions":[{"id":"a","label":"A","type":"yesno"},{"id":"b","label":"B","type":"yesno"},{"id":"c","label":"C","type":"yesno"},{"id":"d","label":"D","type":"yesno"},{"id":"e","label":"E","type":"yesno"},{"id":"f","label":"F","type":"yesno"}]}')$q$,'five');
+select pg_temp.reject($q$select public.workspace_action('job.save','{"id":"bad-job","companyId":"hotel-test","salaryMin":100,"salaryMax":300,"questions":[{"id":"a","label":"A","type":"choice","options":["Same","Same"]}]}')$q$,'unique options');
+select pg_temp.reject($q$select public.workspace_action('job.save','{"id":"bad-job","companyId":"hotel-test","salaryMin":100,"salaryMax":300,"status":"draft","questions":[{"id":"a","label":"A","type":"number","dealBreaker":true,"expected":"1e1000000"}]}')$q$,'numeric expected');
+reset role;
+
+set local role anon;
+select set_config('request.jwt.claim.sub','',true);
+select pg_temp.check_true((select count(*)=0 from public.companies),'pending companies private');
+select pg_temp.check_true((select count(*)=0 from public.jobs),'pending jobs private');
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000001',true);
+select public.workspace_action('company.review','{"id":"hotel-test","status":"approved","reason":"Verified"}');
+select public.workspace_action('job.review','{"id":"job-test","status":"approved","reason":"Reviewed"}');
+select pg_temp.check_true(jsonb_array_length(public.workspace_snapshot()->'accounts')=5,'admin sees account list for moderation');
+reset role;
+set local role anon;
+select set_config('request.jwt.claim.sub','',true);
+select pg_temp.check_true((select count(*)=1 from public.jobs),'approved jobs public');
+select pg_temp.check_true(jsonb_array_length(public.workspace_snapshot()->'jobs')=1,'approved jobs serialized publicly');
+select pg_temp.check_true((select not data?'email' and not data?'phone' and not data?'address' from public.companies),'public company row excludes private contact details');
+select pg_temp.check_true(public.workspace_snapshot()->'companies'->0->>'email'='','public workspace redacts contact email');
+select pg_temp.check_true((select count(*)=0 from public.company_contacts),'anonymous cannot read contacts table');
+select pg_temp.check_true(public.workspace_snapshot()->'profile'='null'::jsonb and jsonb_array_length(public.workspace_snapshot()->'applications')=0,'anonymous workspace contains no private records');
+reset role;
+
+set local role authenticated;
+select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',true);
+select public.workspace_action('profile.save','{"id":"forged-user","name":"","phone":"","email":"applicant@test.example","city":"","department":"","role":"","experience":0,"workHistory":[],"skills":[],"certifications":[],"languages":[],"currentSalary":null,"expectedSalary":0,"noticeDays":0,"availableFrom":"","relocate":false,"preferredCities":[]}');
+select pg_temp.check_true((select id=auth.uid() from public.applicant_profiles),'profile id derives from current user');
+select pg_temp.reject($q$select public.workspace_action('profile.save','{"department":"Software","role":"Developer"}')$q$,'hospitality');
+select pg_temp.check_true(public.workspace_snapshot()->'accounts' is null,'nonadmin cannot enumerate accounts');
+select pg_temp.reject($q$select public.workspace_action('profile.save','{"workHistory":[{"id":"x","start":"2025-13","end":"2026-01"}]}')$q$,'valid date');
+select pg_temp.reject($q$select public.workspace_action('profile.save','{"workHistory":[{"id":"x","start":"2025-03","end":"2024-01"}]}')$q$,'end date');
+select pg_temp.reject($q$select public.workspace_action('profile.save','{"noticeDays":-1}')$q$,'allowed range');
+select pg_temp.reject($q$select public.workspace_action('application.submit','{"jobId":"job-test","answers":{"q1":"yes"}}')$q$,'Complete');
+select public.workspace_action('profile.save','{"id":"forged-user","name":"Asha Rao","phone":"9876543210","email":"applicant@test.example","city":"Mumbai","department":"Front Office","role":"Front Desk Associate","experience":2,"workHistory":[{"id":"exp1","employer":"Previous Hotel","propertyType":"Hotel","role":"Front Desk Associate","start":"2023-01","end":"2025-01","current":false,"reason":"Growth"}],"skills":["Guest relations"],"certifications":[],"languages":[{"name":"English","proficiency":"Fluent"}],"currentSalary":18000,"expectedSalary":25000,"noticeDays":30,"availableFrom":"2027-01-01","relocate":false,"preferredCities":["Mumbai"]}');
+select public.workspace_action('profile.save',(select data||'{"phone":"----------"}'::jsonb from public.applicant_profiles));
+select pg_temp.reject($q$select public.workspace_action('application.submit','{"jobId":"job-test","answers":{"q1":"Yes"}}')$q$,'Complete');
+select public.workspace_action('profile.save',(select data||'{"phone":"98765-4321"}'::jsonb from public.applicant_profiles));
+select pg_temp.reject($q$select public.workspace_action('application.submit','{"jobId":"job-test","answers":{"q1":"Yes"}}')$q$,'Complete');
+select public.workspace_action('profile.save',(select data||'{"phone":"1234567890123456"}'::jsonb from public.applicant_profiles));
+select pg_temp.reject($q$select public.workspace_action('application.submit','{"jobId":"job-test","answers":{"q1":"Yes"}}')$q$,'Complete');
+select public.workspace_action('profile.save',(select data||'{"phone":"+91 98765-43210"}'::jsonb from public.applicant_profiles));
+select pg_temp.reject($q$select public.workspace_action('application.submit','{"jobId":"job-test","answers":{}}')$q$,'required');
+select pg_temp.reject($q$select public.workspace_action('application.submit','{"jobId":"job-test","answers":{"q1":"maybe"}}')$q$,'yes or no');
+select pg_temp.reject($q$select public.workspace_action('application.submit','{"jobId":"job-test","answers":{"q1":"yes","injected":"yes"}}')$q$,'Unknown');
+select public.workspace_action('application.submit','{"jobId":"job-test","answers":{"q1":"no"},"applicantId":"10000000-0000-0000-0000-000000000002","screening":[{"passed":true}]}');
+select pg_temp.check_true((select applicant_id=auth.uid() and (data->'screening'->0->>'passed')::boolean=false and data->'profile'->>'name'='Asha Rao' and data->'jobSnapshot'->>'title'='Front Office Associate' from public.applications),'submission derives identity, snapshot and screening');
+select pg_temp.check_true(jsonb_array_length(public.workspace_snapshot()->'applications')=1 and public.workspace_snapshot()->'applicationCounts' is null,'applicant workspace contains own snapshots without employer counts');
+select pg_temp.reject($q$select public.workspace_action('application.submit','{"jobId":"job-test","answers":{"q1":"yes"}}')$q$,'already applied');
+select pg_temp.reject($q$update public.applications set data='{}'$q$,'permission denied');
+select public.workspace_action('profile.save',(select data || '{"name":"Changed Name"}'::jsonb from public.applicant_profiles));
+select pg_temp.check_true((select data->'profile'->>'name'='Asha Rao' from public.applications),'profile snapshot remains immutable');
+select pg_temp.reject($q$select public.workspace_action('job.close','{"id":"job-test"}')$q$,'Employer');
+select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000002',true);
+select pg_temp.check_true((select count(*)=0 from public.applications),'other applicants cannot read applications');
+select pg_temp.check_true(jsonb_array_length(public.workspace_snapshot()->'applications')=0,'workspace never leaks other applications');
+
+select set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000002',true);
+select pg_temp.check_true((select count(*)=0 from public.applications),'other employers cannot read applications');
+select pg_temp.check_true(public.workspace_snapshot()->'applicationCounts'='{}'::jsonb,'employer counts exclude another employer job');
+select pg_temp.reject($q$select public.workspace_action('company.save','{"id":"hotel-test","name":"Stolen"}')$q$,'own');
+select pg_temp.reject($q$select public.workspace_action('job.close','{"id":"job-test"}')$q$,'own');
+reset role;
+create temp table application_id as select id from public.applications;
+grant select on application_id to authenticated;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000002',true);
+select pg_temp.reject(format('select public.workspace_action(''application.status'', %L::jsonb)',jsonb_build_object('id',(select id from application_id),'status','hired')::text),'own');
+
+select set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000001',true);
+select pg_temp.check_true((select count(*)=1 from public.applications),'owner can read applications');
+select pg_temp.check_true(jsonb_array_length(public.workspace_snapshot()->'applications')=0,'employer workspace omits full candidate snapshots');
+select pg_temp.check_true(public.workspace_snapshot()->'applicationCounts'->'job-test'='{"total":1,"submitted":1,"shortlisted":0}'::jsonb,'employer workspace reports own job counts');
+select pg_temp.check_true((select count(*)=0 from public.applicant_profiles),'employer cannot browse reusable applicant profiles');
+select pg_temp.check_true(public.workspace_snapshot()->'companies'->0->>'email'='hotel@test.example','owner can see company contacts');
+select public.workspace_action('application.status',jsonb_build_object('id',(select id from application_id),'status','shortlisted'));
+select pg_temp.check_true((select status='shortlisted' and jsonb_array_length(data->'events')=2 from public.applications),'status appends an event');
+select pg_temp.check_true(public.workspace_snapshot()->'applicationCounts'->'job-test'='{"total":1,"submitted":0,"shortlisted":1}'::jsonb,'status change updates count summary');
+select pg_temp.reject(format('select public.workspace_action(''application.status'', %L::jsonb)',jsonb_build_object('id',(select id from application_id),'status','withdrawn')::text),'withdraw');
+select public.workspace_action('job.save',(select data || '{"title":"Revised Title","status":"pending"}'::jsonb from public.job_revisions where job_id='job-test' and version=1));
+select pg_temp.check_true(public.workspace_snapshot()->'jobs'->0->>'title'='Front Office Associate' and public.workspace_snapshot()->'jobs'->0->'pendingRevision'->>'title'='Revised Title','pending revision preserves approved public version');
+reset role;
+set local role anon;
+select set_config('request.jwt.claim.sub','',true);
+select pg_temp.check_true(public.workspace_snapshot()->'jobs'->0->>'title'='Front Office Associate','anonymous reads only approved revision');
+select pg_temp.check_true(public.workspace_snapshot()->'jobs'->0->'pendingRevision' is null,'pending revision private');
+select pg_temp.check_true((select count(*)=1 from public.job_revisions),'RLS protects pending revision');
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000001',true);
+select public.workspace_action('job.review','{"id":"job-test","status":"approved","reason":"Updated"}');
+select pg_temp.check_true(public.workspace_snapshot()->'jobs'->0->>'title'='Revised Title','review publishes new version');
+select pg_temp.check_true((select data->'jobSnapshot'->>'title'='Front Office Associate' and job_version=1 from public.applications),'old application job snapshot immutable');
+select pg_temp.check_true(jsonb_array_length(public.workspace_snapshot()->'moderation')=3,'admin sees moderation audit trail');
+select pg_temp.check_true(jsonb_array_length(public.workspace_snapshot()->'applications')=0,'admin workspace also omits candidate snapshots');
+reset role;
+select pg_temp.reject($q$update public.applications set data=data||'{"profile":{"name":"Tampered"}}'::jsonb$q$,'immutable');
+select pg_temp.reject($q$update public.job_revisions set data=data||'{"title":"Tampered"}'::jsonb$q$,'immutable');
+update auth.users set raw_user_meta_data='{"role":"admin"}' where id='10000000-0000-0000-0000-000000000001';
+select pg_temp.check_true((select role='applicant' from public.accounts where id='10000000-0000-0000-0000-000000000001'),'metadata updates cannot change role');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000001',true);
+select public.workspace_action('account.suspend','{"id":"20000000-0000-0000-0000-000000000001","reason":"Safety review"}');
+reset role;
+set local role anon;
+select set_config('request.jwt.claim.sub','',true);
+select pg_temp.check_true((select count(*)=0 from public.jobs),'suspended employer jobs hidden');
+select pg_temp.check_true(public.workspace_snapshot()->'suspensionReason' is null,'anonymous cannot read account suspension reason');
+reset role;
+set local role authenticated;
+select set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000001',true);
+select pg_temp.check_true((public.workspace_snapshot()->>'suspended')::boolean,'suspended workspace reports suspension');
+select pg_temp.check_true(public.workspace_snapshot()->>'suspensionReason'='Safety review','suspended owner receives their own account reason');
+select pg_temp.check_true((select count(*)=0 from public.applications),'suspended account cannot read applications');
+select pg_temp.reject($q$select public.workspace_action('job.close','{"id":"job-test"}')$q$,'suspended');
+select pg_temp.reject($q$select public.workspace_action('company.save','{"id":"hotel-test","name":"Hotel"}')$q$,'suspended');
+select set_config('request.jwt.claim.sub','30000000-0000-0000-0000-000000000001',true);
+select public.workspace_action('account.suspend','{"id":"10000000-0000-0000-0000-000000000001","reason":"Review applicant"}');
+select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',true);
+select pg_temp.check_true((select count(*)=0 from public.applicant_profiles),'suspended applicant cannot read profile');
+select pg_temp.check_true((select count(*)=0 from public.applications),'suspended applicant cannot read applications');
+select pg_temp.reject($q$select public.workspace_action('profile.save','{}')$q$,'suspended');
+reset role;
+update public.accounts set suspended=false where id in ('20000000-0000-0000-0000-000000000001','10000000-0000-0000-0000-000000000001');
+set local role authenticated;
+select set_config('request.jwt.claim.sub','20000000-0000-0000-0000-000000000001',true);
+select public.workspace_action('job.close','{"id":"job-test"}');
+select pg_temp.check_true(public.workspace_snapshot()->'jobs'->0->>'status'='closed','employer can close owned job');
+select pg_temp.reject($q$select public.workspace_action('job.save',(select data||'{"status":"draft"}'::jsonb from public.job_revisions where job_id='job-test' and version=2))$q$,'closed');
+select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000002',true);
+select pg_temp.reject($q$select public.workspace_action('application.submit','{"jobId":"job-test","answers":{"q1":"Yes"}}')$q$,'no longer accepting');
+select pg_temp.check_true(jsonb_array_length(public.workspace_snapshot()->'jobs')=0 and (select count(*)=0 from public.jobs),'unrelated applicant cannot see closed job');
+select set_config('request.jwt.claim.sub','10000000-0000-0000-0000-000000000001',true);
+select pg_temp.check_true(public.workspace_snapshot()->'jobs'->0->>'status'='closed' and public.workspace_snapshot()->'jobs'->0->>'title'='Front Office Associate','applicant tracks closed job using their submitted revision');
+select pg_temp.check_true((select count(*)=1 from public.jobs) and (select count(*)=1 and min(version)=1 from public.job_revisions),'applied applicant RLS sees closed job and only their approved revision');
+reset role;
+rollback;

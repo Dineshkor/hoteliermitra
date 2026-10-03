@@ -1,7 +1,7 @@
-# Hospitality Hire: proposed MVP design
+# Hospitality Hire: approved MVP design
 
 Date: 2026-10-02
-Status: Proposed for user review. Implementation has not started.
+Status: Approved by the user on 2026-10-02; implementation authorized with “lets get to work then”.
 Project directory: `D:\nextjs\hospitality-hire`
 Working name: Hospitality Hire; replace when the owner chooses a brand.
 
@@ -33,25 +33,25 @@ The MVP succeeds when an approved employer can publish an approved vacancy, an a
 
 ## Main pages
 
-| Audience | Page | Purpose |
-| --- | --- | --- |
-| Public | Home (`/`) | Explain hospitality hiring; distinct Find jobs and Hire staff entry points. |
-| Public | Job search (`/jobs`) | Search by role, department, city, property type, salary, accommodation, and meals. |
-| Public | Job details (`/jobs/[id]`) | Structured vacancy, employer/property details, benefits, and Apply action. |
-| Public | Employer page (`/companies/[id]`) | Approved company information and its published vacancies. |
-| Shared | Sign in and sign up | Select applicant or employer and use the agreed authentication method. |
-| Applicant | Dashboard (`/applicant`) | Profile readiness, relevant job links, and recent application statuses. |
-| Applicant | Profile (`/applicant/profile`) | Short, resumable steps to create and edit the reusable profile. |
-| Applicant | Apply (`/jobs/[id]/apply`) | Review profile summary, answer screening questions, and submit once. |
-| Applicant | Applications (`/applicant/applications`) | Track submitted, shortlisted, rejected, hired, and withdrawn applications. |
-| Employer | Dashboard (`/employer`) | Company approval state, vacancies, and new applicant counts. |
-| Employer | Company profile (`/employer/company`) | Create/edit company and property/contact information. |
-| Employer | Vacancies (`/employer/jobs`) | Manage draft, pending, published, rejected, closed, and removed listings. |
-| Employer | Job editor (`/employer/jobs/new`, `/employer/jobs/[id]/edit`) | Structured job form and screening-question builder. |
-| Employer | Applicants (`/employer/jobs/[id]/applicants`) | Filter, sort, open candidates, and update application status. |
-| Employer | Application detail | Submitted profile, work history, answers, fit indicators, and contact actions. |
-| Admin | Review dashboard (`/admin`) | Queues for employer accounts and job listings requiring approval. |
-| Admin | Employer, job, and user management | Approve/reject with reasons; suspend users and remove listings. |
+| Audience  | Page                                                          | Purpose                                                                            |
+| --------- | ------------------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| Public    | Home (`/`)                                                    | Explain hospitality hiring; distinct Find jobs and Hire staff entry points.        |
+| Public    | Job search (`/jobs`)                                          | Search by role, department, city, property type, salary, accommodation, and meals. |
+| Public    | Job details (`/jobs/[id]`)                                    | Structured vacancy, employer/property details, benefits, and Apply action.         |
+| Public    | Employer page (`/companies/[id]`)                             | Approved company information and its published vacancies.                          |
+| Shared    | Sign in and sign up                                           | Select applicant or employer and use the agreed authentication method.             |
+| Applicant | Dashboard (`/applicant`)                                      | Profile readiness, relevant job links, and recent application statuses.            |
+| Applicant | Profile (`/applicant/profile`)                                | Short, resumable steps to create and edit the reusable profile.                    |
+| Applicant | Apply (`/jobs/[id]/apply`)                                    | Review profile summary, answer screening questions, and submit once.               |
+| Applicant | Applications (`/applicant/applications`)                      | Track submitted, shortlisted, rejected, hired, and withdrawn applications.         |
+| Employer  | Dashboard (`/employer`)                                       | Company approval state, vacancies, and new applicant counts.                       |
+| Employer  | Company profile (`/employer/company`)                         | Create/edit company and property/contact information.                              |
+| Employer  | Vacancies (`/employer/jobs`)                                  | Manage draft, pending, published, rejected, closed, and removed listings.          |
+| Employer  | Job editor (`/employer/jobs/new`, `/employer/jobs/[id]/edit`) | Structured job form and screening-question builder.                                |
+| Employer  | Applicants (`/employer/jobs/[id]/applicants`)                 | Filter, sort, open candidates, and update application status.                      |
+| Employer  | Application detail                                            | Submitted profile, work history, answers, fit indicators, and contact actions.     |
+| Admin     | Review dashboard (`/admin`)                                   | Queues for employer accounts and job listings requiring approval.                  |
+| Admin     | Employer, job, and user management                            | Approve/reject with reasons; suspend users and remove listings.                    |
 
 ## User flows
 
