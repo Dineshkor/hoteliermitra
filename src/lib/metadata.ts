@@ -53,10 +53,15 @@ async function getSupabaseData(): Promise<MetaData | null> {
 }
 
 async function getData(): Promise<MetaData> {
-  if (hasSupabaseConfig()) {
-    return (await getSupabaseData()) || (await getDemoData());
+  if (!hasSupabaseConfig()) return getDemoData();
+  const data = await getSupabaseData();
+  if (!data) {
+    console.error(
+      "Supabase is configured but workspace_snapshot() returned no data; serving empty metadata instead of demo fixtures.",
+    );
+    return { jobs: [], companies: [] };
   }
-  return getDemoData();
+  return data;
 }
 
 export async function getJobForMetadata(
