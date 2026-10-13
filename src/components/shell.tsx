@@ -12,7 +12,7 @@ import {
 import { useWorkspace } from "./workspace-provider";
 import { createClient } from "@/lib/supabase/client";
 import { Notice, Button, useTask } from "./ui";
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 export function Brand() {
   return (
     <Link href="/" className="brand" aria-label="Hospitality Hire home">
@@ -27,6 +27,8 @@ export function Brand() {
   );
 }
 export function Shell({ children }: { children: ReactNode }) {
+  const menuRef = useRef<HTMLDetailsElement>(null);
+  const closeMenu = () => { if (menuRef.current) menuRef.current.open = false; };
   const { state, demo, error, reload, reset, switchRole } = useWorkspace();
   const path = usePathname();
   const router = useRouter();
@@ -148,11 +150,11 @@ export function Shell({ children }: { children: ReactNode }) {
                 For employers <ArrowUpRight size={15} />
               </Link>
             )}
-            <details className="mobile-menu">
+            <details className="mobile-menu" ref={menuRef}>
               <summary aria-label="Open navigation">
                 <Menu size={23} />
               </summary>
-              <nav>
+              <nav onClick={closeMenu}>
                 {links.map(([href, label]) => (
                   <Link key={href} href={href}>
                     {label}

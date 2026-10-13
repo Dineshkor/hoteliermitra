@@ -462,7 +462,7 @@ export function Jobs() {
         </aside>
         <div>
           <div className="results-heading">
-            <p>
+            <p aria-live="polite" aria-atomic="true">
               <strong>{loading ? "…" : jobs.length}</strong>{" "}
               {jobs.length === 1 ? "opportunity" : "opportunities"}
               {city ? ` in ${params.get("city")}` : " to explore"}

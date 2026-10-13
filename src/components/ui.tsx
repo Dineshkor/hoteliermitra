@@ -16,7 +16,7 @@ export function Button({
   busy = false,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
-  variant?: string;
+  variant?: "primary" | "secondary" | "outline" | "cream" | "text" | "danger";
   busy?: boolean;
 }) {
   return (
@@ -38,7 +38,7 @@ export function LinkButton({
 }: {
   href: string;
   children: ReactNode;
-  variant?: string;
+  variant?: "primary" | "secondary" | "outline" | "cream" | "text" | "danger";
   arrow?: boolean;
 }) {
   return (
@@ -75,7 +75,7 @@ export function Badge({
   tone = "neutral",
 }: {
   children: ReactNode;
-  tone?: string;
+  tone?: "neutral" | "green" | "sand" | "red";
 }) {
   return <span className={`badge ${tone}`}>{children}</span>;
 }
