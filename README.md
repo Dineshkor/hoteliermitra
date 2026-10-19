@@ -37,11 +37,11 @@ Fit indicators compare stated requirements to submitted data. Screening flags he
 
 1. Create a fresh Supabase project and apply the SQL in `supabase/migrations/` in filename order.
 2. Copy `.env.example` to `.env.local`, then set the project URL and **public publishable key**. A service-role key is not used.
-3. Set the local Auth Site URL to `http://localhost:3001`, configure email OTP templates and delivery, and enable phone authentication with an SMS provider for applicant OTP.
+3. Set the local Auth Site URL to `http://localhost:3001` and configure email OTP templates and delivery. Applicants, employers, and admins all sign in with email OTP; no SMS provider is required.
 4. Sign up an account and privately assign its admin role using the SQL in the setup guide.
 5. Restart Next.js. Configured mode uses the real database and never falls back to fictional data on an error.
 
-See [the complete Supabase setup guide](supabase/README.md) for Auth redirects, email templates, SMS, admin provisioning, API contracts, and database tests. For deployment, set the same two environment variables on a Next.js-compatible host and update Supabase Auth URLs to that origin. No deployment has been performed.
+See [the complete Supabase setup guide](supabase/README.md) for Auth redirects, email templates, admin provisioning, API contracts, and database tests. For deployment, set the same two environment variables on a Next.js-compatible host and update Supabase Auth URLs to that origin. No deployment has been performed.
 
 ## Main routes
 
@@ -65,9 +65,9 @@ With an unconfigured local server running on port 3001, run `npm run test:smoke`
 
 The test suite includes domain rules, demo workflow transitions, request validation, React interaction journeys, and the real SQL migrations under embedded PostgreSQL (PGlite). Database checks cover identity, ownership, privacy, screening, immutable revisions/snapshots, moderation, counts, filtering/pagination, and suspension. The React tests exercise forms and navigation with mocked Next.js routing; they do not replace a real browser layout check.
 
-Verified on 2026-10-19: **66 tests passed**, including **210 SQL assertions**; TypeScript, ESLint, production build, and all ten HTTP smoke checks passed (including the new `/applicant/saved` route). The saved jobs and alerts design and implementation checklist live in `docs/superpowers/`.
+Verified on 2026-10-19: **68 tests passed**, including **210 SQL assertions**; TypeScript, ESLint, production build, and all ten HTTP smoke checks passed (including the new `/applicant/saved` route). The saved jobs and alerts design and implementation checklist live in `docs/superpowers/`.
 
-**Verification limits:** Hosted Supabase Auth, email/SMS delivery, cookie rotation, concurrent sessions, and deployment require project configuration and remain unverified. Desktop/mobile browser visual inspection remains pending because no browser surface was connected in the build environment. Responsive CSS and local HTTP/React interaction checks are implemented.
+**Verification limits:** Hosted Supabase Auth, email delivery, cookie rotation, concurrent sessions, and deployment require project configuration and remain unverified. Desktop/mobile browser visual inspection remains pending because no browser surface was connected in the build environment. Responsive CSS and local HTTP/React interaction checks are implemented.
 
 ## Code map
 
