@@ -13,7 +13,7 @@ for (const route of [
   const response = await fetch(`${origin}${route}`);
   assert.equal(response.status, 200, `${route} status`);
   const html = await response.text();
-  assert.match(html, /Hospitality Hire|hospitalityhire|hospitality/);
+  assert.match(html, /HotelierMitra|hoteliermitra|hospitality/);
   assert.doesNotMatch(html, /We couldn’t load this page/);
   console.log(`PASS ${route}`);
 }

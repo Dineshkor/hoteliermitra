@@ -4,7 +4,7 @@ import {
   getCompaniesForSitemap,
 } from "@/lib/metadata";
 
-const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://hospitalityhire.in";
+const BASE_URL = process.env.NEXT_PUBLIC_SITE_URL || "https://hoteliermitra.com";
 
 export const dynamic = "force-dynamic";
 

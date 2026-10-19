@@ -8,8 +8,8 @@ import type { Workspace } from "@/lib/types";
 import "./globals.css";
 export const metadata: Metadata = {
   title: {
-    default: "Hospitality Hire · Good people. Great hospitality.",
-    template: "%s | Hospitality Hire",
+    default: "HotelierMitra · Good people. Great hospitality.",
+    template: "%s | HotelierMitra",
   },
   description:
     "Hospitality careers across India. Find hotel, restaurant, resort and cafe jobs, or hire your next hospitality team with structured profiles and screening.",

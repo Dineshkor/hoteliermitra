@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: `${company.name} · ${company.type} in ${company.city}`,
     description: company.description.slice(0, 160),
     openGraph: {
-      title: `${company.name} | Hospitality Hire`,
+      title: `${company.name} | HotelierMitra`,
       description: `${company.type} in ${company.city}`,
     },
   };

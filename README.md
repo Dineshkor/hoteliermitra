@@ -1,6 +1,6 @@
-# Hospitality Hire
+# HotelierMitra
 
-A hospitality-only hiring MVP for India, built with Next.js 16, React 19, TypeScript, and Supabase. The working brand is replaceable. Salaries use INR per month.
+A hospitality-only hiring MVP for India, built with Next.js 16, React 19, TypeScript, and Supabase. The brand is HotelierMitra (hoteliermitra.com). Salaries use INR per month.
 
 ## Run locally
 

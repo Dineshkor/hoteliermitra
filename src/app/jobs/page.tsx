@@ -6,7 +6,7 @@ export const metadata: Metadata = {
   description:
     "Browse hotel, restaurant, resort and cafe jobs across India. Filter by department, salary, city and benefits.",
   openGraph: {
-    title: "Find Hospitality Jobs | Hospitality Hire",
+    title: "Find Hospitality Jobs | HotelierMitra",
     description:
       "Browse hotel, restaurant, resort and cafe jobs across India.",
   },

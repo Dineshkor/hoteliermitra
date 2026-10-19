@@ -5,7 +5,7 @@ import {
   ArrowUpRight,
   BriefcaseBusiness,
   Bookmark,
-  ChefHat,
+  Handshake,
   Menu,
   UserRound,
   ClipboardList,
@@ -16,12 +16,12 @@ import { Notice, Button, useTask } from "./ui";
 import { useRef, type ReactNode } from "react";
 export function Brand() {
   return (
-    <Link href="/" className="brand" aria-label="Hospitality Hire home">
+    <Link href="/" className="brand" aria-label="HotelierMitra home">
       <span className="brand-symbol">
-        <ChefHat size={24} strokeWidth={1.6} />
+        <Handshake size={24} strokeWidth={1.6} />
       </span>
       <span>
-        hospitality<span className="brand-accent">hire</span>
+        hotelier<span className="brand-accent">mitra</span>
         <span className="brand-dot">.</span>
       </span>
     </Link>
@@ -205,7 +205,7 @@ export function Shell({ children }: { children: ReactNode }) {
           </div>
         </div>
         <div className="container footer-bottom">
-          <span>© {new Date().getFullYear()} Hospitality Hire</span>
+          <span>© {new Date().getFullYear()} HotelierMitra</span>
           <span>Hotels · Restaurants · Resorts · Cafes · Catering</span>
         </div>
       </footer>

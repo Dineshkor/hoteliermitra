@@ -95,7 +95,7 @@ export function Login() {
       </div>
       <div className="panel auth-form">
         <span className="eyebrow">
-          {role === "admin" ? "PLATFORM ADMIN" : "WELCOME TO HOSPITALITY HIRE"}
+          {role === "admin" ? "PLATFORM ADMIN" : "WELCOME TO HOTELIERMITRA"}
         </span>
         <h2>{sent ? "Check your messages." : "Let’s get you started."}</h2>
         {role !== "admin" && !sent && (
