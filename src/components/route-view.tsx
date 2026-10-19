@@ -6,6 +6,7 @@ import {
   Profile,
   Apply,
   Applications,
+  Saved,
 } from "./pages/applicant";
 import {
   EmployerDashboard,
@@ -28,6 +29,7 @@ export function RouteView({ path: p }: { path: string[] }) {
     if (p.length === 1) return <ApplicantDashboard />;
     if (p.length === 2 && p[1] === "profile") return <Profile />;
     if (p.length === 2 && p[1] === "applications") return <Applications />;
+    if (p.length === 2 && p[1] === "saved") return <Saved />;
   }
   if (p[0] === "employer") {
     if (p.length === 1) return <EmployerDashboard />;

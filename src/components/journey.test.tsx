@@ -11,6 +11,7 @@ import {
 import { WorkspaceProvider } from "./workspace-provider";
 import { RouteView } from "./route-view";
 import { createDemo } from "@/lib/demo";
+import { emptyFilters } from "@/lib/domain";
 import { SearchBar } from "./pages/public";
 import type { Workspace } from "@/lib/types";
 const nav = vi.hoisted(() => ({ url: "/", push: vi.fn(), replace: vi.fn() }));
@@ -271,5 +272,44 @@ describe("hospitality hiring interactions", () => {
     );
     expect(stored.savedSearches[0].name).toBe("Kitchen roles");
     expect(stored.savedSearches[0].alerts).toBe(true);
+  });
+  it("manages saved searches with match counts and alerts toggles", async () => {
+    const state = createDemo();
+    state.savedSearches = [
+      {
+        id: "s1",
+        name: "Kitchen roles",
+        filters: { ...emptyFilters, department: "Kitchen" },
+        alerts: true,
+        createdAt: new Date().toISOString(),
+      },
+    ];
+    nav.url = "/applicant/saved";
+    const user = userEvent.setup();
+    render(<Harness state={state} />);
+    expect(await screen.findByText("Kitchen roles")).toBeTruthy();
+    expect(screen.getByText(/2 matches?/)).toBeTruthy();
+    await user.click(screen.getByRole("button", { name: "Alerts on" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "Alerts off" })).toBeTruthy(),
+    );
+    await user.click(screen.getByRole("button", { name: "Delete search" }));
+    await waitFor(() => expect(screen.queryByText("Kitchen roles")).toBeNull());
+  });
+  it("shows an unavailable row for a saved job that is no longer public", async () => {
+    const state = createDemo();
+    state.savedJobIds = ["ghost-job"];
+    nav.url = "/applicant/saved";
+    const user = userEvent.setup();
+    render(<Harness state={state} />);
+    expect(
+      await screen.findByText("Vacancy no longer available"),
+    ).toBeTruthy();
+    await user.click(
+      screen.getByRole("button", { name: "Remove from saved" }),
+    );
+    await waitFor(() =>
+      expect(screen.queryByText("Vacancy no longer available")).toBeNull(),
+    );
   });
 });

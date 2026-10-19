@@ -4,6 +4,7 @@ import { usePathname, useRouter } from "next/navigation";
 import {
   ArrowUpRight,
   BriefcaseBusiness,
+  Bookmark,
   ChefHat,
   Menu,
   UserRound,
@@ -48,6 +49,7 @@ export function Shell({ children }: { children: ReactNode }) {
           ]
         : [
             ["/jobs", "Find a job"],
+            ["/applicant/saved", "Saved jobs"],
             ["/applicant/applications", "My applications"],
           ];
   async function signout() {
@@ -212,6 +214,10 @@ export function Shell({ children }: { children: ReactNode }) {
           <Link href="/jobs">
             <BriefcaseBusiness size={20} />
             Jobs
+          </Link>
+          <Link href="/applicant/saved">
+            <Bookmark size={20} />
+            Saved
           </Link>
           <Link href="/applicant/applications">
             <ClipboardList size={20} />

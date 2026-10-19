@@ -14,6 +14,9 @@ import {
   CalendarDays,
   CheckCircle2,
   AlertCircle,
+  Bell,
+  BellOff,
+  Bookmark,
 } from "lucide-react";
 import { useWorkspace } from "../workspace-provider";
 import {
@@ -28,6 +31,7 @@ import {
   Status,
   useTask,
 } from "../ui";
+import { JobCard } from "../job-card";
 import { blankProfile } from "@/lib/demo";
 import {
   validateProfile,
@@ -35,6 +39,9 @@ import {
   answerFor,
   getFitIndicators,
   publicJobs,
+  jobMatchesFilters,
+  describeFilters,
+  filtersToSearchParams,
 } from "@/lib/domain";
 import {
   cities,
@@ -1084,6 +1091,17 @@ export function ApplicantDashboard() {
             </LinkButton>
           </div>
           <div className="panel">
+            <Bookmark size={27} />
+            <h2>Saved jobs & alerts</h2>
+            <p className="muted">
+              Keep shortlisted vacancies and daily alerts for your searches in
+              one place.
+            </p>
+            <LinkButton href="/applicant/saved" variant="secondary">
+              View saved jobs
+            </LinkButton>
+          </div>
+          <div className="panel">
             <ShieldCheck size={27} />
             <h2>Your next opportunity</h2>
             <p className="muted">
@@ -1094,5 +1112,169 @@ export function ApplicantDashboard() {
         </div>
       </Guard>
     </div>
+  );
+}
+export function Saved() {
+  return (
+    <div className="container page">
+      <Guard role="applicant">
+        <SavedContent />
+      </Guard>
+    </div>
+  );
+}
+function SavedContent() {
+  const { state, mutate } = useWorkspace(),
+    task = useTask();
+  const visible = publicJobs(state.jobs, state.companies);
+  const searches = [...state.savedSearches].sort((a, b) =>
+    b.createdAt.localeCompare(a.createdAt),
+  );
+  const companyName = (jobId: string) => {
+    const job = state.jobs.find((j) => j.id === jobId);
+    return state.companies.find((c) => c.id === job?.companyId)?.name;
+  };
+  return (
+    <>
+      <PageHeading
+        eyebrow="YOUR SHORTLIST AND DAILY ALERTS"
+        title="Saved jobs and searches."
+        description="Keep an eye on the roles you want. When new vacancies match a saved search, your daily alert will list them."
+        action={
+          <LinkButton href="/jobs" variant="secondary">
+            Explore more jobs <ArrowRight size={16} />
+          </LinkButton>
+        }
+      />
+      <Notice message={task.message} error={task.error} />
+      <div className="section-title">
+        <h2>Saved jobs</h2>
+        <span className="muted">{state.savedJobIds.length} saved</span>
+      </div>
+      {state.savedJobIds.length ? (
+        <div className="job-grid">
+          {state.savedJobIds.map((jobId) => {
+            const job = visible.find((j) => j.id === jobId);
+            if (job)
+              return (
+                <JobCard
+                  key={jobId}
+                  job={job}
+                  company={state.companies.find((c) => c.id === job.companyId)}
+                />
+              );
+            return (
+              <article className="panel saved-unavailable" key={jobId}>
+                <h3>Vacancy no longer available</h3>
+                <p className="muted">
+                  This role has closed or is no longer public.
+                </p>
+                <Button
+                  variant="secondary"
+                  busy={task.busy}
+                  onClick={() =>
+                    void task.run(
+                      () =>
+                        mutate({
+                          action: "savedJob.toggle",
+                          payload: { jobId, saved: false },
+                        }),
+                      "Removed from saved jobs.",
+                    )
+                  }
+                >
+                  Remove from saved
+                </Button>
+              </article>
+            );
+          })}
+        </div>
+      ) : (
+        <Empty
+          title="No saved jobs yet"
+          description="Tap the bookmark icon on any vacancy to keep it here."
+          action={<LinkButton href="/jobs">Browse jobs</LinkButton>}
+        />
+      )}
+      <section className="saved-section">
+        <div className="section-title">
+          <h2>Saved searches</h2>
+          <span className="muted">{searches.length} saved</span>
+        </div>
+        {searches.length ? (
+          <div className="saved-searches-grid">
+            {searches.map((s) => {
+              const count = visible.filter((j) =>
+                jobMatchesFilters(j, companyName(j.id), s.filters),
+              ).length;
+              return (
+                <article className="panel saved-search-card" key={s.id}>
+                  <h3>{s.name}</h3>
+                  <p className="muted">{describeFilters(s.filters)}</p>
+                  <p>
+                    {`${count} ${count === 1 ? "match" : "matches"} right now`}
+                  </p>
+                  <div className="saved-search-actions">
+                    <LinkButton
+                      href={`/jobs?${filtersToSearchParams(s.filters).toString()}`}
+                      variant="secondary"
+                    >
+                      Open search
+                    </LinkButton>
+                    <Button
+                      variant="text"
+                      busy={task.busy}
+                      aria-pressed={s.alerts}
+                      onClick={() =>
+                        void task.run(
+                          () =>
+                            mutate({
+                              action: "savedSearch.alerts",
+                              payload: { id: s.id, alerts: !s.alerts },
+                            }),
+                          s.alerts ? "Daily alerts paused." : "Daily alerts are on.",
+                        )
+                      }
+                    >
+                      {s.alerts ? (
+                        <>
+                          <Bell size={15} /> Alerts on
+                        </>
+                      ) : (
+                        <>
+                          <BellOff size={15} /> Alerts off
+                        </>
+                      )}
+                    </Button>
+                    <Button
+                      variant="text"
+                      busy={task.busy}
+                      onClick={() =>
+                        void task.run(
+                          () =>
+                            mutate({
+                              action: "savedSearch.delete",
+                              payload: { id: s.id },
+                            }),
+                          "Search deleted.",
+                        )
+                      }
+                    >
+                      <Trash2 size={15} /> Delete search
+                    </Button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+        ) : (
+          <Empty
+            title="No saved searches yet"
+            description="Filter the jobs page to what you want, then save the search for daily alerts."
+            action={<LinkButton href="/jobs">Start a search</LinkButton>}
+          />
+        )}
+      </section>
+    </>
   );
 }
