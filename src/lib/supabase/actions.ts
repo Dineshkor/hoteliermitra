@@ -10,6 +10,10 @@ const actions = new Set([
   "company.review",
   "job.review",
   "account.suspend",
+  "savedJob.toggle",
+  "savedSearch.save",
+  "savedSearch.delete",
+  "savedSearch.alerts",
 ]);
 const object = (value: unknown): value is Record<string, unknown> =>
   value !== null && typeof value === "object" && !Array.isArray(value);
@@ -30,12 +34,39 @@ export function parseAction(input: unknown): WorkspaceAction {
       "company.review",
       "job.review",
       "account.suspend",
+      "savedSearch.delete",
+      "savedSearch.alerts",
     ].includes(input.action) &&
     (typeof payload.id !== "string" ||
       !payload.id.trim() ||
       payload.id.length > 100)
   )
     throw new Error("Record ID is required");
+  if (
+    input.action === "savedJob.toggle" &&
+    (typeof payload.jobId !== "string" ||
+      !payload.jobId.trim() ||
+      payload.jobId.length > 100 ||
+      typeof payload.saved !== "boolean")
+  )
+    throw new Error("Invalid saved job");
+  if (input.action === "savedSearch.save") {
+    if (
+      typeof payload.name !== "string" ||
+      !payload.name.trim() ||
+      payload.name.length > 100 ||
+      !object(payload.filters) ||
+      typeof payload.alerts !== "boolean" ||
+      (payload.id !== undefined &&
+        (typeof payload.id !== "string" || payload.id.length > 100))
+    )
+      throw new Error("Invalid saved search");
+  }
+  if (
+    input.action === "savedSearch.alerts" &&
+    typeof payload.alerts !== "boolean"
+  )
+    throw new Error("Invalid search alerts");
   if (
     input.action === "application.status" &&
     !["submitted", "shortlisted", "rejected", "hired", "withdrawn"].includes(

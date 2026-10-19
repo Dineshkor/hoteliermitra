@@ -56,6 +56,60 @@ describe("workspace request boundary", () => {
     expect(safeNextPath("https://evil.example")).toBe("/");
     expect(safeNextPath("/\\evil.example")).toBe("/");
   });
+  it("accepts the saved actions and rejects malformed payloads", () => {
+    expect(
+      parseAction({
+        action: "savedJob.toggle",
+        payload: { jobId: "commis-chef", saved: true },
+      }),
+    ).toEqual({
+      action: "savedJob.toggle",
+      payload: { jobId: "commis-chef", saved: true },
+    });
+    expect(
+      parseAction({
+        action: "savedSearch.save",
+        payload: {
+          id: "",
+          name: "Kitchen jobs",
+          filters: {},
+          alerts: true,
+          createdAt: "2026-10-19T00:00:00.000Z",
+        },
+      }),
+    ).toMatchObject({ action: "savedSearch.save" });
+    expect(
+      parseAction({
+        action: "savedSearch.alerts",
+        payload: { id: "s1", alerts: false },
+      }),
+    ).toEqual({
+      action: "savedSearch.alerts",
+      payload: { id: "s1", alerts: false },
+    });
+    for (const bad of [
+      { action: "savedJob.toggle", payload: { jobId: "j", saved: "yes" } },
+      { action: "savedJob.toggle", payload: { jobId: "", saved: true } },
+      {
+        action: "savedSearch.save",
+        payload: { name: " ", filters: {}, alerts: true },
+      },
+      {
+        action: "savedSearch.save",
+        payload: { name: "x".repeat(101), filters: [], alerts: true },
+      },
+      {
+        action: "savedSearch.save",
+        payload: { name: "ok", filters: {}, alerts: "on" },
+      },
+      {
+        action: "savedSearch.alerts",
+        payload: { id: "s1", alerts: "off" },
+      },
+      { action: "savedSearch.delete", payload: {} },
+    ])
+      expect(() => parseAction(bad)).toThrow();
+  });
 });
 
 describe("candidate query boundary", () => {
