@@ -31,6 +31,19 @@ export const blankProfile = (id = ""): ApplicantProfile => ({
   relocate: false,
   preferredCities: [],
 });
+export function normalizeDemoState(input: unknown): Workspace {
+  if (!input || typeof input !== "object") return createDemo();
+  const state = input as Workspace;
+  if (!Array.isArray(state.jobs) || !Array.isArray(state.companies))
+    return createDemo();
+  return {
+    ...state,
+    savedJobIds: Array.isArray(state.savedJobIds) ? state.savedJobIds : [],
+    savedSearches: Array.isArray(state.savedSearches)
+      ? state.savedSearches
+      : [],
+  };
+}
 export function createDemo(): Workspace {
   const now = new Date();
   const when = (days: number) =>

@@ -3,6 +3,7 @@ import { blankProfile } from "./demo";
 import {
   makeApplication,
   answerFor,
+  normalizeJobFilters,
   transitionAllowed,
   validateJob,
   validateProfile,
@@ -233,6 +234,73 @@ export function applyDemoAction(
       reason: payload.reason,
       at: now,
     });
+  }
+  if (action === "savedJob.toggle") {
+    requireRole("applicant");
+    const job = next.jobs.find((j) => j.id === payload.jobId);
+    const visible =
+      Boolean(job) &&
+      job!.status === "approved" &&
+      next.companies.some(
+        (c) => c.id === job!.companyId && c.status === "approved",
+      );
+    if (payload.saved) {
+      if (
+        !visible &&
+        !next.applications.some(
+          (a) => a.jobId === payload.jobId && a.applicantId === "demo-applicant",
+        )
+      )
+        throw new Error("This job is not available to save.");
+      if (!next.savedJobIds.includes(payload.jobId)) {
+        if (next.savedJobIds.length >= 500)
+          throw new Error("You can save up to 500 jobs.");
+        next.savedJobIds.push(payload.jobId);
+      }
+    } else {
+      next.savedJobIds = next.savedJobIds.filter((id) => id !== payload.jobId);
+    }
+  }
+  if (action === "savedSearch.save") {
+    requireRole("applicant");
+    const name =
+      typeof payload.name === "string" ? payload.name.trim() : "";
+    if (!name || name.length > 100)
+      throw new Error("Give this search a name.");
+    const filters = normalizeJobFilters(payload.filters);
+    const existing = next.savedSearches.find((s) => s.id === payload.id);
+    if (payload.id && !existing) throw new Error("Search not found.");
+    if (existing) {
+      existing.name = name;
+      existing.filters = filters;
+      existing.alerts = payload.alerts;
+    } else {
+      if (next.savedSearches.length >= 50)
+        throw new Error("You can save up to 50 searches.");
+      next.savedSearches.push({
+        id: payload.id || crypto.randomUUID(),
+        name,
+        filters,
+        alerts: payload.alerts,
+        createdAt: payload.createdAt || now,
+      });
+    }
+  }
+  if (action === "savedSearch.delete") {
+    requireRole("applicant");
+    const existing = next.savedSearches.find((s) => s.id === payload.id);
+    if (!existing) throw new Error("Search not found.");
+    next.savedSearches = next.savedSearches.filter(
+      (s) => s.id !== payload.id,
+    );
+  }
+  if (action === "savedSearch.alerts") {
+    requireRole("applicant");
+    const existing = next.savedSearches.find((s) => s.id === payload.id);
+    if (!existing) throw new Error("Search not found.");
+    if (typeof payload.alerts !== "boolean")
+      throw new Error("Choose an alert setting.");
+    existing.alerts = payload.alerts;
   }
   return next;
 }

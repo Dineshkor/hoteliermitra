@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import { applyDemoAction } from "./demo-actions";
-import { createDemo } from "./demo";
+import { createDemo, normalizeDemoState } from "./demo";
+import { emptyFilters } from "./domain";
+import type { SavedSearch } from "./types";
 describe("local hiring journey", () => {
   it("does not publish never-submitted drafts or reopen closed jobs", () => {
     const state = createDemo();
@@ -164,5 +166,157 @@ describe("local hiring journey", () => {
         payload: { ...closed.jobs[0], id: state.jobs[0].id, status: "pending" },
       }),
     ).toThrow("closed");
+  });
+});
+describe("saved jobs and searches in demo mode", () => {
+  it("toggles visible saved jobs and rejects unavailable or unauthorized ones", () => {
+    const state = createDemo();
+    const saved = applyDemoAction(state, {
+      action: "savedJob.toggle",
+      payload: { jobId: "commis-chef", saved: true },
+    });
+    expect(saved.savedJobIds).toContain("commis-chef");
+    const unsaved = applyDemoAction(saved, {
+      action: "savedJob.toggle",
+      payload: { jobId: "commis-chef", saved: false },
+    });
+    expect(unsaved.savedJobIds).toEqual([]);
+    expect(() =>
+      applyDemoAction(state, {
+        action: "savedJob.toggle",
+        payload: { jobId: "pending-cook", saved: true },
+      }),
+    ).toThrow("not available");
+    expect(() =>
+      applyDemoAction(
+        { ...state, role: "employer", userId: "demo-employer" },
+        {
+          action: "savedJob.toggle",
+          payload: { jobId: "commis-chef", saved: true },
+        },
+      ),
+    ).toThrow("Switch to the applicant demo");
+  });
+  it("caps saved jobs at 500", () => {
+    const state = {
+      ...createDemo(),
+      savedJobIds: Array.from({ length: 500 }, (_, i) => `job-${i}`),
+    };
+    expect(() =>
+      applyDemoAction(state, {
+        action: "savedJob.toggle",
+        payload: { jobId: "commis-chef", saved: true },
+      }),
+    ).toThrow("up to 500");
+    const removed = applyDemoAction(state, {
+      action: "savedJob.toggle",
+      payload: { jobId: "job-0", saved: false },
+    });
+    expect(removed.savedJobIds).toHaveLength(499);
+  });
+  it("saves, updates, toggles and deletes searches with normalized filters", () => {
+    const state = createDemo();
+    const saved = applyDemoAction(state, {
+      action: "savedSearch.save",
+      payload: {
+        id: "",
+        name: " Weekend chefs ",
+        filters: { ...emptyFilters, q: "chef", department: "Kitchen" },
+        alerts: true,
+        createdAt: "2026-10-19T00:00:00.000Z",
+      },
+    });
+    expect(saved.savedSearches).toHaveLength(1);
+    const search = saved.savedSearches[0];
+    expect(search.name).toBe("Weekend chefs");
+    expect(search.filters).toEqual({
+      ...emptyFilters,
+      q: "chef",
+      department: "Kitchen",
+    });
+    expect(search.alerts).toBe(true);
+    const updated = applyDemoAction(saved, {
+      action: "savedSearch.save",
+      payload: { ...search, name: "Kitchen roles", alerts: false },
+    });
+    expect(updated.savedSearches).toHaveLength(1);
+    expect(updated.savedSearches[0].name).toBe("Kitchen roles");
+    expect(updated.savedSearches[0].alerts).toBe(false);
+    expect(updated.savedSearches[0].createdAt).toBe(search.createdAt);
+    const on = applyDemoAction(updated, {
+      action: "savedSearch.alerts",
+      payload: { id: search.id, alerts: true },
+    });
+    expect(on.savedSearches[0].alerts).toBe(true);
+    const removed = applyDemoAction(on, {
+      action: "savedSearch.delete",
+      payload: { id: search.id },
+    });
+    expect(removed.savedSearches).toEqual([]);
+    expect(() =>
+      applyDemoAction(state, {
+        action: "savedSearch.delete",
+        payload: { id: "missing" },
+      }),
+    ).toThrow("Search not found");
+    expect(() =>
+      applyDemoAction(state, {
+        action: "savedSearch.save",
+        payload: {
+          id: "missing",
+          name: "Kitchen roles",
+          filters: emptyFilters,
+          alerts: true,
+          createdAt: "2026-10-19T00:00:00.000Z",
+        },
+      }),
+    ).toThrow("Search not found");
+    expect(() =>
+      applyDemoAction(state, {
+        action: "savedSearch.save",
+        payload: {
+          id: "",
+          name: "Bad",
+          filters: { ...emptyFilters, department: "Astrology" },
+          alerts: true,
+          createdAt: "2026-10-19T00:00:00.000Z",
+        },
+      }),
+    ).toThrow();
+  });
+  it("caps saved searches at 50", () => {
+    const searches: SavedSearch[] = Array.from({ length: 50 }, (_, i) => ({
+      id: `s-${i}`,
+      name: `Search ${i}`,
+      filters: emptyFilters,
+      alerts: true,
+      createdAt: "2026-10-19T00:00:00.000Z",
+    }));
+    const state = { ...createDemo(), savedSearches: searches };
+    expect(() =>
+      applyDemoAction(state, {
+        action: "savedSearch.save",
+        payload: {
+          id: "",
+          name: "One more",
+          filters: emptyFilters,
+          alerts: true,
+          createdAt: "2026-10-19T00:00:00.000Z",
+        },
+      }),
+    ).toThrow("up to 50");
+  });
+});
+describe("legacy demo state", () => {
+  it("normalizes persisted state missing saved fields instead of resetting", () => {
+    const legacy = structuredClone(createDemo()) as Record<string, unknown>;
+    delete legacy.savedJobIds;
+    delete legacy.savedSearches;
+    const normalized = normalizeDemoState(legacy);
+    expect(normalized.savedJobIds).toEqual([]);
+    expect(normalized.savedSearches).toEqual([]);
+    expect(normalized.profile?.name).toBe("Aarav Sharma");
+    expect(normalizeDemoState("nonsense").jobs.length).toBeGreaterThan(0);
+    expect(normalizeDemoState(null).companies.length).toBeGreaterThan(0);
   });
 });

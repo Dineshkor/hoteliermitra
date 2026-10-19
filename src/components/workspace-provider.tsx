@@ -10,7 +10,7 @@ import {
 } from "react";
 import { usePathname } from "next/navigation";
 import type { Role, Workspace, WorkspaceAction } from "@/lib/types";
-import { createDemo, emptyWorkspace } from "@/lib/demo";
+import { createDemo, emptyWorkspace, normalizeDemoState } from "@/lib/demo";
 import { applyDemoAction } from "@/lib/demo-actions";
 const storageKey = "hospitality-hire-demo-v2";
 const configured = Boolean(
@@ -73,9 +73,7 @@ export function WorkspaceProvider({
         const saved = localStorage.getItem(storageKey);
         let next: Workspace;
         try {
-          next = saved ? JSON.parse(saved) : createDemo();
-          if (!Array.isArray(next.jobs) || !Array.isArray(next.companies))
-            next = createDemo();
+          next = saved ? normalizeDemoState(JSON.parse(saved)) : createDemo();
         } catch {
           next = createDemo();
         }
