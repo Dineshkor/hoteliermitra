@@ -235,6 +235,26 @@ hr {
   background: var(--green-light);
   color: var(--green);
 }
+.icon-link.saved {
+  background: var(--green-light);
+  color: var(--green);
+}
+.save-search {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin: 0 0 14px;
+}
+.save-search-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.save-search-form .field {
+  margin: 0;
+  min-width: 240px;
+}
 .danger {
   color: var(--red);
 }

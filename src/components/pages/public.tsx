@@ -24,7 +24,9 @@ import {
   HeartHandshake,
 } from "lucide-react";
 import { useWorkspace } from "../workspace-provider";
-import { publicJobs } from "@/lib/domain";
+import { filtersFromSearchParams, jobMatchesFilters, publicJobs } from "@/lib/domain";
+import { SaveSearchBar } from "../save-search";
+import { CompanyMark, JobCard, SaveJobButton } from "../job-card";
 import {
   departments,
   propertyTypes,
@@ -33,7 +35,6 @@ import {
   dateLabel,
 } from "@/lib/taxonomy";
 import { Badge, Empty, Field, LinkButton, Loading, PageHeading } from "../ui";
-import { CompanyMark, JobCard } from "../job-card";
 const departmentIcons = [
   ChefHat,
   UtensilsCrossed,
@@ -356,27 +357,20 @@ export function Jobs() {
   const { state, loading } = useWorkspace();
   const params = useSearchParams(),
     router = useRouter();
-  const q = params.get("q")?.toLowerCase() || "",
-    city = params.get("city")?.toLowerCase() || "",
-    department = params.get("department") || "",
-    type = params.get("type") || "",
-    min = Number(params.get("salary") || 0);
+  const filters = filtersFromSearchParams(params),
+    city = filters.city,
+    department = filters.department,
+    type = filters.propertyType;
   const jobs = publicJobs(state.jobs, state.companies)
-    .filter(
-      (j) =>
-        (!q ||
-          `${j.title} ${j.role} ${j.skills.join(" ")} ${state.companies.find((c) => c.id === j.companyId)?.name}`
-            .toLowerCase()
-            .includes(q)) &&
-        (!city || j.city.toLowerCase().includes(city)) &&
-        (!department || j.department === department) &&
-        (!type || j.propertyType === type) &&
-        j.salaryMin >= min &&
-        (params.get("stay") !== "yes" || j.accommodation) &&
-        (params.get("meals") !== "yes" || j.meals),
+    .filter((j) =>
+      jobMatchesFilters(
+        j,
+        state.companies.find((c) => c.id === j.companyId)?.name,
+        filters,
+      ),
     )
     .sort((a, b) =>
-      params.get("sort") === "salary"
+      filters.sort === "salary"
         ? b.salaryMax - a.salaryMax
         : b.createdAt.localeCompare(a.createdAt),
     );
@@ -394,6 +388,7 @@ export function Jobs() {
         description="A better fit starts with clear expectations."
       />
       <SearchBar compact />
+      <SaveSearchBar filters={filters} />
       <div className="search-layout">
         <aside className="filter-panel">
           <div className="filter-heading">
@@ -566,6 +561,7 @@ export function JobDetail({ id }: { id: string }) {
               <Badge tone="green">
                 <ShieldCheck size={13} /> Reviewed employer
               </Badge>
+              <SaveJobButton jobId={job.id} />
             </div>
             <h1>{job.title}</h1>
             <div className="job-tags">

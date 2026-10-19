@@ -1,8 +1,10 @@
 "use client";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import {
   ArrowUpRight,
   BedDouble,
+  Bookmark,
   MapPin,
   Utensils,
   Clock3,
@@ -12,11 +14,57 @@ import {
 import type { Company, Job } from "@/lib/types";
 import { salary } from "@/lib/taxonomy";
 import { Badge } from "./ui";
+import { useWorkspace } from "./workspace-provider";
+import { useTask } from "./ui";
 export function CompanyMark({ company }: { company?: Company }) {
   return (
     <span className={`company-mark ${company?.color || "sand"}`}>
       {company?.initials || "HH"}
     </span>
+  );
+}
+export function SaveJobButton({ jobId }: { jobId: string }) {
+  const { state, mutate } = useWorkspace();
+  const pathname = usePathname();
+  const task = useTask();
+  const role = state.role;
+  const saved = state.savedJobIds.includes(jobId);
+  if (role === null)
+    return (
+      <Link
+        href={`/login?next=${encodeURIComponent(pathname)}`}
+        className="icon-link"
+        aria-label="Sign in to save this job"
+      >
+        <Bookmark size={19} />
+      </Link>
+    );
+  if (role !== "applicant") return null;
+  return (
+    <button
+      type="button"
+      className={`icon-link ${saved ? "saved" : ""}`}
+      aria-pressed={saved}
+      aria-label={saved ? "Saved job" : "Save job"}
+      disabled={task.busy}
+      onClick={() =>
+        void task.run(
+          () =>
+            mutate({
+              action: "savedJob.toggle",
+              payload: { jobId, saved: !saved },
+            }),
+          saved ? "Removed from saved jobs." : "Job saved.",
+        )
+      }
+    >
+      <Bookmark size={19} fill={saved ? "currentColor" : "none"} />
+      {task.message && (
+        <span className="sr-only" role="status">
+          {task.message}
+        </span>
+      )}
+    </button>
   );
 }
 export function JobCard({ job, company }: { job: Job; company?: Company }) {
@@ -37,6 +85,7 @@ export function JobCard({ job, company }: { job: Job; company?: Company }) {
             )}
           </span>
         </div>
+        <SaveJobButton jobId={job.id} />
         <Link
           href={`/jobs/${job.id}`}
           className="icon-link"

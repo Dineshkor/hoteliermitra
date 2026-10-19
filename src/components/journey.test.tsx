@@ -230,4 +230,46 @@ describe("hospitality hiring interactions", () => {
     expect(screen.getByText("Full-time")).toBeDefined();
     expect(screen.getByText(/Tandoor station.*Pastry station/)).toBeDefined();
   });
+  it("saves a job from the list and persists it", async () => {
+    nav.url = "/jobs";
+    render(<Harness state={createDemo()} />);
+    const user = userEvent.setup();
+    const buttons = await screen.findAllByRole("button", { name: "Save job" });
+    await user.click(buttons[0]);
+    await waitFor(() =>
+      expect(screen.getAllByRole("button", { name: "Saved job" }).length).toBe(
+        1,
+      ),
+    );
+    expect(
+      JSON.parse(localStorage.getItem("hospitality-hire-demo-v2") || "{}")
+        .savedJobIds,
+    ).toHaveLength(1);
+  });
+  it("routes anonymous visitors to sign in instead of saving", async () => {
+    nav.url = "/jobs";
+    render(<Harness state={{ ...createDemo(), role: null, userId: null }} />);
+    const links = await screen.findAllByRole("link", {
+      name: "Sign in to save this job",
+    });
+    expect(links[0].getAttribute("href")).toContain("/login");
+  });
+  it("saves the current search with alerts on", async () => {
+    nav.url = "/jobs?department=Kitchen";
+    render(<Harness state={createDemo()} />);
+    const user = userEvent.setup();
+    await user.click(
+      await screen.findByRole("button", { name: "Save this search" }),
+    );
+    const input = screen.getByLabelText("Search name");
+    await user.clear(input);
+    await user.type(input, "Kitchen roles");
+    await user.click(screen.getByRole("button", { name: "Save search" }));
+    await screen.findByText(/Search saved/);
+    const stored = JSON.parse(
+      localStorage.getItem("hospitality-hire-demo-v2") || "{}",
+    );
+    expect(stored.savedSearches[0].name).toBe("Kitchen roles");
+    expect(stored.savedSearches[0].alerts).toBe(true);
+  });
 });
