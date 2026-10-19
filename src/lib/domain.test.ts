@@ -8,8 +8,24 @@ import {
   transitionAllowed,
   makeApplication,
   publicJobs,
+  emptyFilters,
+  filtersFromSearchParams,
+  filtersToSearchParams,
+  jobMatchesFilters,
+  normalizeJobFilters,
+  describeFilters,
+  defaultSearchName,
+  buildDigest,
 } from "./domain";
-import type { ApplicantProfile, Company, Job, Question } from "./types";
+import { createDemo } from "./demo";
+import type {
+  ApplicantProfile,
+  Company,
+  Job,
+  Question,
+  JobFilters,
+  SavedSearch,
+} from "./types";
 const profile: ApplicantProfile = {
   id: "candidate",
   name: "Aarav",
@@ -191,5 +207,127 @@ describe("application decisions", () => {
     expect(
       publicJobs([job], [{ ...company, status: "approved" }]),
     ).toHaveLength(1);
+  });
+});
+describe("saved search filters and digest", () => {
+  it("round-trips the canonical filter shape through URL params", () => {
+    const filters = filtersFromSearchParams(
+      new URLSearchParams(
+        "q=chef&city=Pune&department=Kitchen&type=Hotel&salary=25000&stay=yes&meals=yes&sort=salary",
+      ),
+    );
+    expect(filters).toEqual({
+      q: "chef",
+      city: "Pune",
+      department: "Kitchen",
+      propertyType: "Hotel",
+      salaryMin: 25000,
+      stay: true,
+      meals: true,
+      sort: "salary",
+    });
+    expect(filtersToSearchParams(filters).toString()).toBe(
+      "q=chef&city=Pune&department=Kitchen&type=Hotel&salary=25000&stay=yes&meals=yes&sort=salary",
+    );
+    expect(
+      filtersFromSearchParams(new URLSearchParams("salary=-5&sort=random")),
+    ).toEqual(emptyFilters);
+  });
+  it("normalizes hostile filter input and rejects invalid values", () => {
+    expect(
+      normalizeJobFilters({
+        q: " chef ",
+        salaryMin: 20000,
+        sort: "salary",
+        extra: "dropped",
+      }),
+    ).toEqual({ ...emptyFilters, q: "chef", salaryMin: 20000, sort: "salary" });
+    for (const bad of [
+      { department: "Astrology" },
+      { propertyType: "Spaceship" },
+      { salaryMin: -1 },
+      { salaryMin: Number.NaN },
+      { salaryMin: 1.5 },
+      { q: "x".repeat(201) },
+      { stay: "yes" },
+      { sort: "popular" },
+      null,
+    ])
+      expect(() => normalizeJobFilters(bad)).toThrow();
+  });
+  it("matches jobs exactly like the public search filters", () => {
+    const demo = createDemo();
+    const palm = demo.companies.find((c) => c.id === "palm")!;
+    const commis = demo.jobs.find((j) => j.id === "commis-chef")!;
+    expect(
+      jobMatchesFilters(commis, palm.name, {
+        ...emptyFilters,
+        department: "Kitchen",
+      }),
+    ).toBe(true);
+    expect(
+      jobMatchesFilters(commis, palm.name, { ...emptyFilters, city: "mumbai" }),
+    ).toBe(false);
+    expect(
+      jobMatchesFilters(commis, palm.name, { ...emptyFilters, stay: true }),
+    ).toBe(true);
+    expect(
+      jobMatchesFilters(commis, palm.name, {
+        ...emptyFilters,
+        salaryMin: 30000,
+      }),
+    ).toBe(false);
+    expect(
+      jobMatchesFilters(commis, palm.name, { ...emptyFilters, q: "palm" }),
+    ).toBe(true);
+  });
+  it("builds a digest that excludes applied and non-public jobs and de-duplicates across searches", () => {
+    const demo = createDemo();
+    const searches: SavedSearch[] = [
+      {
+        id: "s1",
+        name: "Kitchen",
+        filters: { ...emptyFilters, department: "Kitchen" },
+        alerts: true,
+        createdAt: "2026-10-01T00:00:00.000Z",
+      },
+      {
+        id: "s2",
+        name: "Goa",
+        filters: { ...emptyFilters, city: "Goa" },
+        alerts: true,
+        createdAt: "2026-10-02T00:00:00.000Z",
+      },
+      {
+        id: "s3",
+        name: "Kitchen again",
+        filters: { ...emptyFilters, department: "Kitchen" },
+        alerts: true,
+        createdAt: "2026-10-03T00:00:00.000Z",
+      },
+    ];
+    const digest = buildDigest(searches, demo.jobs, demo.companies, [
+      "commis-chef",
+    ]);
+    expect(digest).toHaveLength(1);
+    expect(digest[0].searchId).toBe("s1");
+    expect(digest[0].matches.map((j) => j.id)).toEqual(["sous-chef"]);
+    const future = new Date(Date.now() + 86_400_000).toISOString();
+    expect(
+      buildDigest(searches, demo.jobs, demo.companies, [], future),
+    ).toEqual([]);
+  });
+  it("describes filters and derives search names", () => {
+    const filters: JobFilters = {
+      ...emptyFilters,
+      department: "Kitchen",
+      city: "Pune",
+      salaryMin: 20000,
+      stay: true,
+    };
+    expect(describeFilters(filters)).toContain("Kitchen");
+    expect(describeFilters(filters)).toContain("Stay provided");
+    expect(defaultSearchName(filters)).toBe("Kitchen jobs in Pune");
+    expect(defaultSearchName(emptyFilters)).toBe("Hospitality jobs");
   });
 });

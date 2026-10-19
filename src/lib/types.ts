@@ -89,6 +89,23 @@ export type Job = {
   pendingRevision?: Job;
 };
 export type Answers = Record<string, string>;
+export type JobFilters = {
+  q: string;
+  city: string;
+  department: string;
+  propertyType: string;
+  salaryMin: number;
+  stay: boolean;
+  meals: boolean;
+  sort: "newest" | "salary";
+};
+export type SavedSearch = {
+  id: string;
+  name: string;
+  filters: JobFilters;
+  alerts: boolean;
+  createdAt: string;
+};
 export type ScreeningResult = {
   questionId: string;
   label: string;
@@ -127,6 +144,8 @@ export type Workspace = {
   jobs: Job[];
   applications: Application[];
   moderation: ModerationEvent[];
+  savedJobIds: string[];
+  savedSearches: SavedSearch[];
   suspended?: boolean;
   suspensionReason?: string;
   accounts?: { id: string; role: Role; name: string; suspended: boolean }[];
@@ -164,4 +183,11 @@ export type WorkspaceAction =
         reason: string;
       };
     }
-  | { action: "account.suspend"; payload: { id: string; reason: string } };
+  | { action: "account.suspend"; payload: { id: string; reason: string } }
+  | {
+      action: "savedJob.toggle";
+      payload: { jobId: string; saved: boolean };
+    }
+  | { action: "savedSearch.save"; payload: SavedSearch }
+  | { action: "savedSearch.delete"; payload: { id: string } }
+  | { action: "savedSearch.alerts"; payload: { id: string; alerts: boolean } };

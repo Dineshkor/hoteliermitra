@@ -8,6 +8,8 @@ export const emptyWorkspace: Workspace = {
   jobs: [],
   applications: [],
   moderation: [],
+  savedJobIds: [],
+  savedSearches: [],
 };
 export const blankProfile = (id = ""): ApplicantProfile => ({
   id,
@@ -373,6 +375,8 @@ export function createDemo(): Workspace {
     jobs,
     applications,
     moderation: [],
+    savedJobIds: [],
+    savedSearches: [],
     accounts: [
       {
         id: "demo-applicant",

@@ -6,11 +6,13 @@ import type {
   Company,
   FitIndicator,
   Job,
+  JobFilters,
   Question,
   Role,
+  SavedSearch,
   ScreeningResult,
 } from "./types";
-import { departments, propertyTypes } from "./taxonomy";
+import { departments, propertyTypes, salary } from "./taxonomy";
 export type CandidateFilters = {
   status?: string;
   experienceMin?: number;
@@ -314,4 +316,159 @@ export function publicJobs(jobs: Job[], companies: Company[]): Job[] {
       j.status === "approved" &&
       companies.some((c) => c.id === j.companyId && c.status === "approved"),
   );
+}
+export const emptyFilters: JobFilters = {
+  q: "",
+  city: "",
+  department: "",
+  propertyType: "",
+  salaryMin: 0,
+  stay: false,
+  meals: false,
+  sort: "newest",
+};
+export type ParamReader = { get(name: string): string | null };
+export function filtersFromSearchParams(params: ParamReader): JobFilters {
+  const salaryMin = Number(params.get("salary") ?? 0);
+  return {
+    q: params.get("q")?.trim() ?? "",
+    city: params.get("city")?.trim() ?? "",
+    department: params.get("department")?.trim() ?? "",
+    propertyType: params.get("type")?.trim() ?? "",
+    salaryMin: Number.isFinite(salaryMin) && salaryMin > 0 ? salaryMin : 0,
+    stay: params.get("stay") === "yes",
+    meals: params.get("meals") === "yes",
+    sort: params.get("sort") === "salary" ? "salary" : "newest",
+  };
+}
+export function filtersToSearchParams(filters: JobFilters): URLSearchParams {
+  const params = new URLSearchParams();
+  if (filters.q) params.set("q", filters.q);
+  if (filters.city) params.set("city", filters.city);
+  if (filters.department) params.set("department", filters.department);
+  if (filters.propertyType) params.set("type", filters.propertyType);
+  if (filters.salaryMin > 0) params.set("salary", String(filters.salaryMin));
+  if (filters.stay) params.set("stay", "yes");
+  if (filters.meals) params.set("meals", "yes");
+  if (filters.sort === "salary") params.set("sort", "salary");
+  return params;
+}
+export function jobMatchesFilters(
+  job: Job,
+  companyName: string | undefined,
+  filters: JobFilters,
+): boolean {
+  return (
+    (!filters.q ||
+      `${job.title} ${job.role} ${job.skills.join(" ")} ${companyName ?? ""}`
+        .toLowerCase()
+        .includes(filters.q.toLowerCase())) &&
+    (!filters.city ||
+      job.city.toLowerCase().includes(filters.city.toLowerCase())) &&
+    (!filters.department || job.department === filters.department) &&
+    (!filters.propertyType || job.propertyType === filters.propertyType) &&
+    job.salaryMin >= filters.salaryMin &&
+    (!filters.stay || job.accommodation) &&
+    (!filters.meals || job.meals)
+  );
+}
+export function normalizeJobFilters(input: unknown): JobFilters {
+  if (!input || typeof input !== "object" || Array.isArray(input))
+    throw new Error("Invalid search filters.");
+  const source = input as Record<string, unknown>;
+  const text = (key: "q" | "city"): string => {
+    const value = source[key];
+    if (value === undefined) return "";
+    if (typeof value !== "string" || value.length > 200)
+      throw new Error("Search text is too long.");
+    return value.trim();
+  };
+  const choice = (
+    key: "department" | "propertyType",
+    allowed: string[],
+  ): string => {
+    const value = source[key];
+    if (value === undefined || value === "") return "";
+    if (typeof value !== "string" || !allowed.includes(value))
+      throw new Error("Choose a valid filter value.");
+    return value;
+  };
+  const salaryMin = source.salaryMin;
+  if (
+    salaryMin !== undefined &&
+    (typeof salaryMin !== "number" ||
+      !Number.isInteger(salaryMin) ||
+      salaryMin < 0 ||
+      salaryMin > 1_000_000_000)
+  )
+    throw new Error("Enter a valid minimum salary.");
+  const flag = (key: "stay" | "meals"): boolean => {
+    const value = source[key];
+    if (value === undefined) return false;
+    if (typeof value !== "boolean")
+      throw new Error(`${key} must be true or false.`);
+    return value;
+  };
+  const sort = source.sort;
+  if (sort !== undefined && sort !== "newest" && sort !== "salary")
+    throw new Error("Choose a valid search sort.");
+  return {
+    q: text("q"),
+    city: text("city"),
+    department: choice("department", Object.keys(departments)),
+    propertyType: choice("propertyType", propertyTypes),
+    salaryMin: (salaryMin as number | undefined) ?? 0,
+    stay: flag("stay"),
+    meals: flag("meals"),
+    sort: sort === "salary" ? "salary" : "newest",
+  };
+}
+export function describeFilters(filters: JobFilters): string {
+  const parts = [
+    filters.q,
+    filters.department === "Food & Beverage Service"
+      ? "F&B Service"
+      : filters.department,
+    filters.propertyType,
+    filters.city,
+    filters.salaryMin > 0 ? `${salary(filters.salaryMin)}+ / month` : "",
+    filters.stay ? "Stay provided" : "",
+    filters.meals ? "Meals included" : "",
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : "All hospitality jobs";
+}
+export function defaultSearchName(filters: JobFilters): string {
+  const base =
+    filters.q || filters.department || filters.propertyType || "Hospitality";
+  return `${base} jobs${filters.city ? ` in ${filters.city}` : ""}`.slice(
+    0,
+    100,
+  );
+}
+export function buildDigest(
+  searches: SavedSearch[],
+  jobs: Job[],
+  companies: Company[],
+  appliedJobIds: string[],
+  since?: string,
+): { searchId: string; matches: Job[] }[] {
+  const visible = publicJobs(jobs, companies).filter(
+    (job) =>
+      !appliedJobIds.includes(job.id) && (!since || job.createdAt > since),
+  );
+  const assigned = new Set<string>();
+  const digest: { searchId: string; matches: Job[] }[] = [];
+  for (const search of [...searches].sort((a, b) =>
+    a.createdAt.localeCompare(b.createdAt),
+  )) {
+    const matches = visible.filter((job) => {
+      if (assigned.has(job.id)) return false;
+      const company = companies.find((c) => c.id === job.companyId);
+      return jobMatchesFilters(job, company?.name, search.filters);
+    });
+    if (!matches.length) continue;
+    for (const match of matches) assigned.add(match.id);
+    digest.push({ searchId: search.id, matches });
+  }
+  return digest;
 }
