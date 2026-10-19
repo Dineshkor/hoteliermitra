@@ -27,10 +27,11 @@ npm start
 - Job-specific yes/no, choice, number, and short-text screening, with explicit deal-breaker conditions. Applications capture immutable profile, job, and answer snapshots; duplicate applications are blocked.
 - Employer company onboarding, vacancy drafts and moderation, pending revisions, closing, twelve-candidate pagination, filters/sorting, transparent fit comparisons, shortlist/reject/hire, and explicit phone/email contact actions.
 - Applicant status tracking, decision history, withdrawal, and visibility of closed or removed vacancies already applied to.
+- Saved jobs and saved searches with an explicit daily-alerts opt-in. The saved page keeps a shortlist, shows live match counts per search, and keeps closed or removed vacancies visible with one-tap removal.
 - Admin company/vacancy approval, rejection/removal reasons, suspension, account management, and moderation history. Live admin access is assigned privately.
 - Supabase cookie authentication, database-enforced role/ownership rules, RLS-protected reads, and checked transactional mutations. Employers see snapshots only for applicants to their own vacancies.
 
-Fit indicators compare stated requirements to submitted data. Screening flags help employers review candidates; they do not automatically reject applications. There is no chat, AI matching, payment system, native app, or complex analytics.
+Fit indicators compare stated requirements to submitted data. Screening flags help employers review candidates; they do not automatically reject applications. Saved-search alerts store the delivery-ready match logic (`buildDigest`) and alert preferences now, but digest email sending, its scheduler, and unsubscribe handling are deliberately deferred until deployment. There is no chat, AI matching, payment system, native app, or complex analytics.
 
 ## Connect Supabase
 
@@ -47,7 +48,7 @@ See [the complete Supabase setup guide](supabase/README.md) for Auth redirects, 
 | Audience  | Routes                                                                                                                                                                                   |
 | --------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Public    | `/`, `/jobs`, `/jobs/[id]`, `/companies/[id]`, `/login`                                                                                                                                  |
-| Applicant | `/applicant`, `/applicant/profile`, `/jobs/[id]/apply`, `/applicant/applications`                                                                                                        |
+| Applicant | `/applicant`, `/applicant/profile`, `/jobs/[id]/apply`, `/applicant/applications`, `/applicant/saved`                                                         |
 | Employer  | `/employer`, `/employer/company`, `/employer/jobs`, `/employer/jobs/new`, `/employer/jobs/[id]/edit`, `/employer/jobs/[id]/applicants`, `/employer/jobs/[id]/applicants/[applicationId]` |
 | Admin     | `/admin`, `/admin/users`                                                                                                                                                                 |
 
@@ -64,7 +65,7 @@ With an unconfigured local server running on port 3001, run `npm run test:smoke`
 
 The test suite includes domain rules, demo workflow transitions, request validation, React interaction journeys, and the real SQL migrations under embedded PostgreSQL (PGlite). Database checks cover identity, ownership, privacy, screening, immutable revisions/snapshots, moderation, counts, filtering/pagination, and suspension. The React tests exercise forms and navigation with mocked Next.js routing; they do not replace a real browser layout check.
 
-Verified on 2026-10-03: **45 tests passed**, including **173 SQL assertions**; TypeScript, ESLint, production build, and all nine HTTP smoke checks passed. Independent specification and code-quality reviews are complete.
+Verified on 2026-10-19: **66 tests passed**, including **210 SQL assertions**; TypeScript, ESLint, production build, and all ten HTTP smoke checks passed (including the new `/applicant/saved` route). The saved jobs and alerts design and implementation checklist live in `docs/superpowers/`.
 
 **Verification limits:** Hosted Supabase Auth, email/SMS delivery, cookie rotation, concurrent sessions, and deployment require project configuration and remain unverified. Desktop/mobile browser visual inspection remains pending because no browser surface was connected in the build environment. Responsive CSS and local HTTP/React interaction checks are implemented.
 

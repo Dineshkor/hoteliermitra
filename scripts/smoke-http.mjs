@@ -5,6 +5,7 @@ for (const route of [
   "/jobs",
   "/jobs/commis-chef",
   "/applicant/profile",
+  "/applicant/saved",
   "/employer",
   "/admin",
   "/login",
