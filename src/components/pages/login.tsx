@@ -33,47 +33,28 @@ export function Login() {
     await task.run(
       async () => {
         const supabase = createClient();
-        const result =
-          role === "applicant"
-            ? await supabase.auth.signInWithOtp({
-                phone: contact.startsWith("+")
-                  ? contact
-                  : `+91${contact.replace(/\D/g, "")}`,
-                options: { shouldCreateUser: true, data: { role } },
-              })
-            : await supabase.auth.signInWithOtp({
-                email: contact,
-                options: {
-                  shouldCreateUser: role !== "admin",
-                  data: role === "admin" ? undefined : { role },
-                  emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(destination)}`,
-                },
-              });
+        const result = await supabase.auth.signInWithOtp({
+          email: contact,
+          options: {
+            shouldCreateUser: role !== "admin",
+            data: role === "admin" ? undefined : { role },
+            emailRedirectTo: `${window.location.origin}/auth/confirm?next=${encodeURIComponent(destination)}`,
+          },
+        });
         if (result.error) throw new Error(result.error.message);
         setSent(true);
       },
-      role === "applicant"
-        ? "A verification code has been sent to your phone."
-        : "Check your email for the verification code or sign-in link.",
+      "Check your email for the verification code or sign-in link.",
     );
   }
   async function verify() {
     await task.run(async () => {
       const supabase = createClient();
-      const result =
-        role === "applicant"
-          ? await supabase.auth.verifyOtp({
-              phone: contact.startsWith("+")
-                ? contact
-                : `+91${contact.replace(/\D/g, "")}`,
-              token: code,
-              type: "sms",
-            })
-          : await supabase.auth.verifyOtp({
-              email: contact,
-              token: code,
-              type: "email",
-            });
+      const result = await supabase.auth.verifyOtp({
+        email: contact,
+        token: code,
+        type: "email",
+      });
       if (result.error) throw new Error(result.error.message);
       await reload();
       router.push(destination);
@@ -196,8 +177,7 @@ export function Login() {
                     setCode("");
                   }}
                 >
-                  Use a different{" "}
-                  {role === "applicant" ? "phone number" : "email"}
+                  Use a different email
                 </Button>
               </>
             ) : (
@@ -207,27 +187,18 @@ export function Login() {
                     ? "Sign in with your privately provisioned admin account."
                     : "Sign in or create your account with a verification code."}
                 </p>
-                <Field
-                  label={
-                    role === "applicant" ? "Mobile number" : "Email address"
-                  }
-                  hint={
-                    role === "applicant"
-                      ? "Indian mobile number, with or without +91."
-                      : undefined
-                  }
-                >
+                <Field label="Email address">
                   <input
                     value={contact}
                     disabled={task.busy}
                     onChange={(e) => setContact(e.target.value)}
-                    type={role === "applicant" ? "tel" : "email"}
-                    autoComplete={role === "applicant" ? "tel" : "email"}
+                    type="email"
+                    autoComplete="email"
                     required
                     placeholder={
-                      role === "applicant"
-                        ? "9876543210"
-                        : "you@yourproperty.com"
+                      role === "employer"
+                        ? "you@yourproperty.com"
+                        : "you@example.com"
                     }
                   />
                 </Field>
